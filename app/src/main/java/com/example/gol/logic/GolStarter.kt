@@ -1,6 +1,6 @@
 package com.example.gol.logic
 
-data class GolStarter(val name:String , val nubRows: Int, val nubCols: Int, val data: List<List<Boolean>>) {
+data class GolStarter(val name:String, val numRows: Int, val numCols: Int, val data: List<List<Boolean>>) {
     companion object {
         val infinite_glider = GolStarter("Infinite Glider",26, 36, listOf(
             listOf(false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,false,false,false,false,false,false,false,false,false,false),

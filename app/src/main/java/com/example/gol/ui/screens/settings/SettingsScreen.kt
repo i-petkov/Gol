@@ -1,4 +1,4 @@
-package com.example.gol.ui.screens
+package com.example.gol.ui.screens.settings
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
 import com.example.gol.logic.GolStarter
 
 @Composable
@@ -50,17 +49,4 @@ fun SettingsScreenPreview() {
         override val starters: List<GolStarter> = GolStarter.starters
         override fun selectStarter(starter: GolStarter) { /* no op */ }
     })
-}
-
-interface SettingsViewModelInterface {
-    val starters: List<GolStarter>
-    fun selectStarter(starter: GolStarter)
-}
-
-class SettingsScreenViewModel : ViewModel(), SettingsViewModelInterface {
-    override val starters = GolStarter.starters
-
-    override fun selectStarter(starter: GolStarter) {
-
-    }
 }
