@@ -1,25 +1,36 @@
 package com.example.gol.ui.screens.gol
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.gol.gameStarterState
+import com.example.gol.GolApplication
+import com.example.gol.logic.GolStarter
 import com.example.gol.logic.TileFactory
 import com.example.gol.logic.evolve
+import com.example.gol.logic.findBase
+import com.example.gol.logic.toIntermediate
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
+import java.util.concurrent.CancellationException
 
 interface GolViewModelInterface {
     val gameSpeed: StateFlow<Speed>
-    val isGameRunning: StateFlow<Boolean>
+    val isGameRunning: StateFlow<GameActiveState>
     val items: StateFlow<List<Boolean>>
     val itemsColumn: StateFlow<Int>
 
     fun pauseGame()
     fun resumeGame()
+    fun stop()
     fun setSpeed(speed: Speed)
 }
 
@@ -27,13 +38,25 @@ enum class Speed(val delay: Long) {
     Slow(600), Normal(250), Fast(100)
 }
 
+enum class GameActiveState {
+    Running, Paused, Stopped
+}
+
 class GolViewModel(application: Application) : AndroidViewModel(application), GolViewModelInterface {
-    private val _isGameRunning: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    companion object {
+        const val cancellationStateStop = "Stop"
+        const val cancellationStateSuspended = "Suspended"
+        const val cancellationStateError = "Error"
+        const val cancellationStateNew = "New"
+        const val LOG_TAG = "GolViewModel"
+    }
+
+    private val _isGameRunning: MutableStateFlow<GameActiveState> = MutableStateFlow(GameActiveState.Stopped)
     private val _items: MutableStateFlow<List<Boolean>> = MutableStateFlow(emptyList())
     private val _itemsColumn: MutableStateFlow<Int> = MutableStateFlow(0)
     private val _gameSpeed: MutableStateFlow<Speed> = MutableStateFlow(Speed.Normal)
 
-    override val isGameRunning: StateFlow<Boolean> = _isGameRunning
+    override val isGameRunning: StateFlow<GameActiveState> = _isGameRunning
     override val items: StateFlow<List<Boolean>> = _items
     override val itemsColumn: StateFlow<Int> = _itemsColumn
     override val gameSpeed: StateFlow<Speed> = _gameSpeed
@@ -50,11 +73,15 @@ class GolViewModel(application: Application) : AndroidViewModel(application), Go
     }
 
     override fun pauseGame() {
-        _isGameRunning.compareAndSet(expect = true, false)
+        _isGameRunning.value = GameActiveState.Paused
     }
 
     override fun resumeGame() {
-        _isGameRunning.compareAndSet(expect = false, true)
+        _isGameRunning.value = GameActiveState.Running
+    }
+
+    override fun stop() {
+        _isGameRunning.value = GameActiveState.Stopped
     }
 
     override fun setSpeed(speed: Speed) {
@@ -63,17 +90,55 @@ class GolViewModel(application: Application) : AndroidViewModel(application), Go
 
     init {
         viewModelScope.launch {
-            application.gameStarterState.collectLatest {
-                var buffer = it.data
-                _items.emit(buffer.flatten())
-                _itemsColumn.emit(it.numCols)
-                while (true) {
-                    if (isGameRunning.value) {
-                        _items.emit(buffer.flatten())
-                        buffer = buffer.evolve(tileFactory)
+            var updateCycleJob: Job? = null
+            getApplication<GolApplication>().gameStarterState.collectLatest { starter ->
+                updateCycleJob?.cancel(CancellationException(cancellationStateNew))
+                // load state
+                _items.emit(starter.data.flatten())
+                _itemsColumn.emit(starter.numCols)
+                // run game loop
+                isGameRunning.collectLatest { gameActiveState ->
+                    when (gameActiveState) {
+                        GameActiveState.Stopped -> {
+                            // cancel update cycle without persisting state
+                            updateCycleJob?.cancel(CancellationException(cancellationStateStop))
+                        }
+                        GameActiveState.Paused -> {
+                            // cancel update cycle and persist state
+                            updateCycleJob?.cancel(CancellationException(cancellationStateSuspended))
+                        }
+                        GameActiveState.Running -> {
+                            // start update cycle
+                            updateCycleJob?.cancel(CancellationException(cancellationStateError))
+                            updateCycleJob = startEvolutionFlowJob(starter)
+                        }
                     }
-                    delay(gameSpeed.value.delay)
                 }
+            }
+        }
+    }
+
+    private fun startEvolutionFlowJob(starter: GolStarter): Job {
+        return viewModelScope.launch { startEvolutionFlow(starter).collect() }
+    }
+
+    private fun startEvolutionFlow(starter: GolStarter): Flow<Unit> {
+        var buffer = starter.data
+        return flow<Unit> {
+            while (true) {
+                _items.emit(buffer.flatten())
+                buffer = buffer.evolve(tileFactory)
+                delay(gameSpeed.value.delay)
+            }
+        }.onCompletion {
+            if (cancellationStateSuspended == it?.message) {
+                getApplication<GolApplication>().updateStarter(starter.toIntermediate(buffer))
+            } else if (cancellationStateError == it?.message) {
+                Log.e(LOG_TAG, "Stale Evolution Flow canceled with an error, please investigate")
+            } else if (cancellationStateNew == it?.message) {
+                Log.e(LOG_TAG, "Stale Evolution Flow canceled with a NEW State")
+            } else { // stopped
+                getApplication<GolApplication>().updateStarter(starter.findBase())
             }
         }
     }

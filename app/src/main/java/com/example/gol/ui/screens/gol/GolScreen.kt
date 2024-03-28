@@ -30,7 +30,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.gol.logic.GolStarter
+import com.example.gol.logic.BaseGolStarter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -116,7 +116,10 @@ fun GolScreen(onSettingsClicked: ()->Unit, viewModel: GolViewModelInterface) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Button(
-                    onClick = onSettingsClicked,
+                    onClick = {
+                        viewModel.stop()
+                        onSettingsClicked()
+                    },
                     modifier = Modifier.weight(1f).padding(6.dp)
                 ) {
                     Text(text = "Settings")
@@ -124,7 +127,7 @@ fun GolScreen(onSettingsClicked: ()->Unit, viewModel: GolViewModelInterface) {
                 Spacer(modifier = Modifier.weight(1f).padding(6.dp),)
                 Button(
                     onClick = {
-                        if (isGameRunning.value) {
+                        if (isGameRunning.value == GameActiveState.Running) {
                             viewModel.pauseGame()
                         } else {
                             viewModel.resumeGame()
@@ -133,7 +136,7 @@ fun GolScreen(onSettingsClicked: ()->Unit, viewModel: GolViewModelInterface) {
                     modifier = Modifier.weight(1f).padding(6.dp),
                     enabled = isValid
                 ) {
-                    Text(text = if(isGameRunning.value) "Pause" else "Run")
+                    Text(text = if(isGameRunning.value == GameActiveState.Running) "Pause" else "Run")
                 }
             }
         }
@@ -153,12 +156,12 @@ fun GolTile(isAlive: Boolean, size: Dp) {
 @Preview
 @Composable
 fun GolScreenPreview() {
-    val starter = GolStarter.infinite_glider
+    val starter = BaseGolStarter.infinite_glider
    GolScreen(onSettingsClicked = { /* no-op */ }, object : GolViewModelInterface {
        override val gameSpeed: StateFlow<Speed>
            get() = MutableStateFlow(Speed.Normal)
-       override val isGameRunning: StateFlow<Boolean>
-           get() = MutableStateFlow(false)
+       override val isGameRunning: StateFlow<GameActiveState>
+           get() = MutableStateFlow(GameActiveState.Stopped)
        override val items: StateFlow<List<Boolean>>
            get() = MutableStateFlow(starter.data.flatten())
        override val itemsColumn: StateFlow<Int>
@@ -169,5 +172,7 @@ fun GolScreenPreview() {
        override fun resumeGame() { /* no-op */ }
 
        override fun setSpeed(speed: Speed) { /* no-op */ }
+
+       override fun stop() { /* no-op */ }
    })
 }

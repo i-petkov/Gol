@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.gol.logic.GolStarter
+import com.example.gol.logic.BaseGolStarter
 
 @Composable
 fun SettingsScreen(onBackPressed: ()-> Unit, viewModel: SettingsViewModelInterface) {
@@ -62,7 +62,7 @@ fun SettingsScreen(onBackPressed: ()-> Unit, viewModel: SettingsViewModelInterfa
 @Composable
 fun SettingsScreenPreview() {
     SettingsScreen(onBackPressed = { /* no op */ }, object : SettingsViewModelInterface {
-        override val starters: List<GolStarter> = GolStarter.starters
-        override fun selectStarter(starter: GolStarter) { /* no op */ }
+        override val starters: List<BaseGolStarter> = BaseGolStarter.starters
+        override fun selectStarter(starter: BaseGolStarter) { /* no op */ }
     })
 }
