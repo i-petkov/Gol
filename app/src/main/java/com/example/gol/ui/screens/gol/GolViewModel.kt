@@ -27,6 +27,7 @@ interface GolViewModelInterface {
     val isGameRunning: StateFlow<GameActiveState>
     val items: StateFlow<List<Boolean>>
     val itemsColumn: StateFlow<Int>
+    val basePatternName: StateFlow<String>
 
     fun pauseGame()
     fun resumeGame()
@@ -44,21 +45,26 @@ enum class GameActiveState {
 
 class GolViewModel(application: Application) : AndroidViewModel(application), GolViewModelInterface {
     companion object {
+        const val LOG_TAG = "GolViewModel"
+
         const val cancellationStateStop = "Stop"
         const val cancellationStateSuspended = "Suspended"
         const val cancellationStateError = "Error"
         const val cancellationStateNew = "New"
-        const val LOG_TAG = "GolViewModel"
+
+        const val gameStateLoading = "Loading..."
     }
 
     private val _isGameRunning: MutableStateFlow<GameActiveState> = MutableStateFlow(GameActiveState.Stopped)
     private val _items: MutableStateFlow<List<Boolean>> = MutableStateFlow(emptyList())
     private val _itemsColumn: MutableStateFlow<Int> = MutableStateFlow(0)
     private val _gameSpeed: MutableStateFlow<Speed> = MutableStateFlow(Speed.Normal)
+    private val _basePatternName: MutableStateFlow<String> = MutableStateFlow(gameStateLoading)
 
     override val isGameRunning: StateFlow<GameActiveState> = _isGameRunning
     override val items: StateFlow<List<Boolean>> = _items
     override val itemsColumn: StateFlow<Int> = _itemsColumn
+    override val basePatternName: StateFlow<String> = _basePatternName
     override val gameSpeed: StateFlow<Speed> = _gameSpeed
 
 //    val itemsCount: Int
@@ -96,6 +102,7 @@ class GolViewModel(application: Application) : AndroidViewModel(application), Go
                 // load state
                 _items.emit(starter.data.flatten())
                 _itemsColumn.emit(starter.numCols)
+                _basePatternName.emit(starter.findBase().name)
                 // run game loop
                 isGameRunning.collectLatest { gameActiveState ->
                     when (gameActiveState) {
@@ -140,6 +147,7 @@ class GolViewModel(application: Application) : AndroidViewModel(application), Go
             } else { // stopped
                 getApplication<GolApplication>().updateStarter(starter.findBase())
             }
+            _basePatternName.emit(gameStateLoading)
         }
     }
 }

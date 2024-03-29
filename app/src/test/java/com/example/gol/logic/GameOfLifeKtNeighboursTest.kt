@@ -39,7 +39,7 @@ class GameOfLifeKtNeighboursTest {
             }
 
             // going a bit out of hand and should probably be extracted in separate test cases,
-            // but this is exhausting avery possible permutations
+            // but this is exhausting avery possible permutation
             fun expectedNeighbours(rol: Int, col: Int): List<Int> {
                 val x = array[rol][col]
                 return when {
